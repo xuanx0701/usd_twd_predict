@@ -4,7 +4,7 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
-def fetch_data(start_date="2010-01-01", end_date=None):
+def fetch_data(start_date="2010-01-01", end_date="2026-05-21"):
     """下載 USD/TWD 歷史資料"""
     if end_date is None:
         end_date = datetime.now().strftime("%Y-%m-%d")

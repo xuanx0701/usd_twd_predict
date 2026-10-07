@@ -2,6 +2,7 @@
 =============================================================
   USD/TWD 匯率機器學習預測系統
   目標：預測 2025/5/29 台幣兌美元匯率
+  作業截止日：2025/5/20
 =============================================================
   方法架構：
   1. 經濟基本面特徵（利差、通膨、貿易、DXY）
@@ -26,6 +27,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import shap
 from matplotlib import rcParams
 import yfinance as yf
 
@@ -48,7 +50,7 @@ print("=" * 65)
 # ─────────────────────────────────────────────
 #  資料獲取模組
 # ─────────────────────────────────────────────
-def fetch_data(start_date="2010-01-01", end_date="2025-05-20"):
+def fetch_data(start_date="2010-01-01", end_date="2026-05-20"):
     """下載 USD/TWD 歷史資料"""
     if end_date is None:
         end_date = datetime.now().strftime("%Y-%m-%d")
@@ -354,6 +356,18 @@ class EnsemblePredictor:
         importances = rf.feature_importances_
         fi = pd.DataFrame({'feature': feature_names, 'importance': importances})
         return fi.sort_values('importance', ascending=False)
+
+
+    def get_shap_values(self, X, feature_names):
+        """計算 Random Forest 的 SHAP values。"""
+        X_scaled = self.scaler.transform(X)
+        X_scaled_df = pd.DataFrame(X_scaled, columns=feature_names)
+
+        rf = self.models['Random Forest']
+        explainer = shap.TreeExplainer(rf)
+        shap_values = explainer(X_scaled_df)
+
+        return explainer, shap_values, X_scaled_df
  
  
 # ─────────────────────────────────────────────
@@ -558,6 +572,65 @@ def plot_results(df_full, y_test, y_pred_test, dates_test,
     return plot_path
  
  
+
+# ─────────────────────────────────────────────
+#  SHAP 模型解釋
+# ─────────────────────────────────────────────
+
+def run_shap_analysis(predictor, X_test, X_latest, feature_cols, output_dir):
+    """
+    使用 Random Forest 進行 SHAP 分析。
+    輸出：
+      - shap_beeswarm.png：全域重要性與影響方向
+      - shap_bar.png：平均絕對 SHAP value 排名
+      - shap_waterfall_latest.png：最新一筆資料的預測解釋
+      - shap_importance.csv：平均絕對 SHAP value 排名
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    print("\n    === SHAP 分析（Random Forest）===")
+
+    # 取測試集最近最多 500 筆，避免 SHAP 計算過久
+    X_shap = X_test[-min(500, len(X_test)):]
+
+    _, shap_values, _ = predictor.get_shap_values(X_shap, feature_cols)
+
+    # 1. Beeswarm：同時看重要性、特徵值高低與預測影響方向
+    shap.plots.beeswarm(shap_values, max_display=15, show=False)
+    beeswarm_path = os.path.join(output_dir, "shap_beeswarm.png")
+    plt.savefig(beeswarm_path, dpi=180, bbox_inches="tight")
+    plt.close()
+
+    # 2. Bar：以 mean(|SHAP value|) 顯示全域特徵重要性
+    shap.plots.bar(shap_values, max_display=15, show=False)
+    bar_path = os.path.join(output_dir, "shap_bar.png")
+    plt.savefig(bar_path, dpi=180, bbox_inches="tight")
+    plt.close()
+
+    # 3. Waterfall：解釋最新一筆資料在 Random Forest 中的預測形成
+    _, latest_shap, _ = predictor.get_shap_values(X_latest, feature_cols)
+    shap.plots.waterfall(latest_shap[0], max_display=15, show=False)
+    waterfall_path = os.path.join(output_dir, "shap_waterfall_latest.png")
+    plt.savefig(waterfall_path, dpi=180, bbox_inches="tight")
+    plt.close()
+
+    # 4. 儲存 SHAP 全域重要性
+    mean_abs_shap = np.abs(shap_values.values).mean(axis=0)
+    shap_importance = pd.DataFrame({
+        "feature": feature_cols,
+        "mean_abs_shap": mean_abs_shap
+    }).sort_values("mean_abs_shap", ascending=False)
+
+    shap_csv_path = os.path.join(output_dir, "shap_importance.csv")
+    shap_importance.to_csv(shap_csv_path, index=False)
+
+    print(f"    SHAP beeswarm：{beeswarm_path}")
+    print(f"    SHAP bar：{bar_path}")
+    print(f"    SHAP waterfall：{waterfall_path}")
+    print(f"    SHAP importance CSV：{shap_csv_path}")
+
+    return shap_importance
+
+
 # ─────────────────────────────────────────────
 #  主程式
 # ─────────────────────────────────────────────
@@ -627,6 +700,16 @@ def main():
  
     # ── 特徵重要性
     feature_importance = predictor.get_feature_importance(feature_cols)
+
+
+    # ── SHAP 分析（Random Forest）
+    shap_importance = run_shap_analysis(
+        predictor=predictor,
+        X_test=X_test,
+        X_latest=X_latest,
+        feature_cols=feature_cols,
+        output_dir=OUTPUT_DIR,
+    )
  
     # ── 繪圖
     plot_results(
@@ -660,6 +743,7 @@ def main():
         "cv_avg_MAE": round(cv_df['MAE'].mean(), 4),
         "cv_avg_RMSE": round(cv_df['RMSE'].mean(), 4),
         "top10_features": feature_importance.head(10)['feature'].tolist(),
+        "top10_shap_features": shap_importance.head(10)['feature'].tolist(),
         "data_range": {
             "start": str(df['Date'].min().date()),
             "end": str(df['Date'].max().date()),
