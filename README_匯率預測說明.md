@@ -1,5 +1,4 @@
 # USD/TWD 匯率機器學習預測系統
-## 作業報告 | 2025/05/20 截止
 
 ---
 
@@ -63,55 +62,10 @@ weight_i = (1/MAE_i) / Σ(1/MAE_j)
 
 使用 `TimeSeriesSplit` 確保未來資訊不洩漏至訓練集，共 5 折驗證。
 
----
-
-## 四、預測結果
-
-### 2025/05/29 USD/TWD 預測
-
-| 模型 | 預測值 |
-|------|--------|
-| Random Forest | 31.08 |
-| Gradient Boosting | 31.13 |
-| Ridge Regression | 31.44 |
-| ElasticNet | 31.32 |
-| **集成模型（最終預測）** | **31.26** |
-| 信賴區間（±1 RMSE） | [30.93, 31.59] |
-
-### 模型評估指標
-
-| 指標 | 測試集 | CV 平均 |
-|------|--------|---------|
-| MAE | 0.2641 | 0.2971 |
-| RMSE | 0.3274 | 0.3722 |
-| R² | 0.8617 | — |
-| MAPE | 0.86% | 0.97% |
-
-**解讀：** MAPE ≈ 0.86% 表示平均預測誤差不超過匯率的 1%，對於匯率短期預測而言屬於良好表現。
 
 ---
 
-## 五、關鍵特徵解讀
-
-依 Random Forest 特徵重要性排名，最重要的預測因子為：
-
-1. **技術面**：移動平均、EMA、近期報酬率
-2. **經濟面**：DXY 代理、聯準會利率、台美利差
-3. **情緒面**：VIX 恐慌指數
-4. **結構面**：外資流動、季節效應
-
----
-
-## 六、模型限制與風險
-
-1. **黑天鵝事件：** 模型無法預測突發的政治、地緣衝突、央行干預等事件
-2. **非定常性：** 匯率時間序列受到結構性斷點影響（如 QE、升息週期切換）
-3. **資料代理誤差：** 部分經濟特徵以代理變數估算，存在測量誤差
-4. **有效市場假說：** 強式有效市場理論認為技術分析無法持續獲利，但短期動能效應仍具預測價值
-
----
-
-## 七、如何執行
+## 四、如何執行
 
 ```bash
 # 安裝依賴
@@ -125,21 +79,3 @@ python3 usd_twd_predict.py
 # output/prediction_results.json    → 完整預測結果
 # output/feature_importance.csv     → 特徵重要性
 ```
-
-### 進階：使用真實資料
-
-在 `fetch_usd_twd_from_stooq()` 函式中，可替換為以下真實資料來源：
-- **台灣央行：** https://www.cbc.gov.tw（歷史匯率月資料）
-- **FRED API：** https://fred.stlouisfed.org（美國利率、DXY）
-- **Yahoo Finance（yfinance）：** `pip install yfinance`，代碼 `USDTWD=X`
-- **台灣股市資訊：** https://www.twse.com.tw（外資買超資料）
-
----
-
-## 參考文獻
-
-1. Frankel & Rose (1995). Empirical research on nominal exchange rates. *Handbook of International Economics*
-2. Meese & Rogoff (1983). Empirical exchange rate models of the seventies. *Journal of International Economics*
-3. Ni et al. (2024). Enhancing Exchange Rate Forecasting with Explainable Deep Learning Models. *arXiv:2410.19241*
-4. 台灣央行 (2025). 有關國內匯市及美債等議題之說明. https://www.cbc.gov.tw
-5. 今周刊 (2025). 台幣對美金匯率被低估55%？「台灣病」分析
